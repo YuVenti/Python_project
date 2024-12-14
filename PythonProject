@@ -1,0 +1,164 @@
+from datetime import datetime, timedelta
+
+class HotelReservation:
+    """
+    A class to manage hotel reservations using a list.
+    """
+    TotalRooms = 200
+    TotalReservations = 0
+    Reservations = [] # List to store reservations
+
+    ROOM_RATES = {
+        "Twin Room": 100,
+        "King Room": 150,
+        "Sea-View Room": 200,
+        "Executive Suite": 300,
+    }
+    ROOM_COUNTS = {
+        "Twin Room": 50,
+        "King Room": 50,
+        "Sea-View Room": 50,
+        "Executive Suite": 50,
+    }
+
+    def __init__(self, reservation_id, customer_name, room_number, check_in_date, check_out_date, room_type):
+        """
+        Initialize a new hotel reservation.
+        """
+        self.reservation_id = reservation_id
+        self.customer_name = customer_name
+        self.room_number = room_number
+        self.check_in_date = check_in_date
+        self.check_out_date = check_out_date
+        self.room_type = room_type
+
+        HotelReservation.Reservations.append(self)
+        HotelReservation.TotalReservations += 1
+
+    def __del__(self):
+        """
+        Destructor to delete a reservation from the list.
+        """
+        for i, res in enumerate(HotelReservation.Reservations):
+            if res.reservation_id == self.reservation_id:
+                del HotelReservation.Reservations[i]
+                HotelReservation.TotalReservations -= 1
+                print(f"Reservation ID {self.reservation_id} has been deleted.")
+                return
+
+    def make_reservation(self, room_number, check_in_date, check_out_date, room_type):
+        """
+        Makes a reservation for a specific room and dates.
+        """
+        for res in HotelReservation.Reservations:
+            if res.room_number == room_number and not (
+                check_out_date <= res.check_in_date or check_in_date >= res.check_out_date
+            ):
+                raise ValueError(f"Room {room_number} is already reserved for the given dates.")
+            HotelReservation.check_valid_dates(check_in_date, check_out_date)
+            new_reservation = HotelReservation(
+                HotelReservation.TotalReservations + 1,
+                self.customer_name,
+                room_number,
+                check_in_date,
+                check_out_date,
+                room_type,
+            )
+            return f"Reservation for {room_type} (Room {room_number}) successfully created from {check_in_date} to {check_out_date}."
+
+    def cancel_reservation(self, reservation_id):
+        """
+        Cancels an existing reservation using the reservation ID.
+        """
+        for i, res in enumerate(HotelReservation.Reservations):
+            if res.reservation_id == reservation_id:
+                del HotelReservation.Reservations[i]
+                HotelReservation.TotalReservations -= 1
+                return f"Reservation ID {reservation_id} has been successfully canceled."
+        raise KeyError(f"Reservation ID {reservation_id} does not exist.")
+    
+
+    def display_reservation(self):
+        """
+        Displays details of the current reservation.
+        """
+        return (f"Reservation ID: {self.reservation_id}\n"
+                f"Customer Name: {self.customer_name}\n"
+                f"Room Number: {self.room_number}\n"
+                f"Room Type: {self.room_type}\n"
+                f"Check-in Date: {self.check_in_date}\n"
+                f"Check-out Date: {self.check_out_date}")
+
+    @classmethod
+    def available_rooms(cls):
+        """
+        Returns the number of available rooms by type.
+        """
+        occupied = {rtype: 0 for rtype in cls.ROOM_RATES}
+        for res in cls.Reservations:
+            occupied[res.room_type] += 1
+
+        return "\n".join(
+            [f"Available {rtype}s: {cls.ROOM_COUNTS[rtype] - occupied[rtype]}" for rtype in cls.ROOM_RATES]
+        )
+
+    @classmethod
+    def query_daily_reservations(cls, date):
+        """
+        Displays all reservations for a specific date.
+        """
+        reservations = [res for res in cls.Reservations if res.check_in_date <= date < res.check_out_date]
+        if not reservations:
+            return f"No reservations found for {date}."
+        return "\n".join([f"Room {res.room_number} ({res.room_type}) - {res.customer_name}" for res in reservations])
+
+    def extend_reservation(self, additional_days):
+        """
+        Extends the stay for an existing reservation.
+        """
+        old_check_out_date = datetime.strptime(self.check_out_date, "%Y-%m-%d")
+        new_check_out_date = old_check_out_date + timedelta(days=additional_days)
+        new_check_out_date_str = new_check_out_date.strftime("%Y-%m-%d")
+        
+        for res in HotelReservation.Reservations:
+            if (
+                res.room_number == self.room_number
+                and res.reservation_id != self.reservation_id
+                and not (new_check_out_date_str <= res.check_in_date or self.check_out_date <= res.check_in_date)
+            ):
+                raise ValueError(f"Extension overlaps with another reservation in Room {self.room_number}.")
+
+        self.check_out_date = new_check_out_date_str
+        return f"Reservation ID {self.reservation_id} successfully extended to {self.check_out_date}."
+
+    @staticmethod
+    def calculate_daily_revenue(date):
+        """
+        Calculates daily revenue based on room rates and reservations.
+        """
+        revenue = sum(
+            HotelReservation.ROOM_RATES[res.room_type]
+            for res in HotelReservation.Reservations
+            if res.check_in_date <= date < res.check_out_date
+        )
+        return f"Total revenue for {date}: ${revenue}"
+
+    @staticmethod
+    def check_valid_dates(check_in_date, check_out_date):
+        """
+        Validates check-in and check-out dates.
+        """
+        if check_out_date <= check_in_date:
+            raise ValueError("Check-out date must be after check-in date.")
+
+    @classmethod
+    def list_all_reservations(cls):
+        """
+        Lists all reservations in the hotel.
+        """
+        if not cls.Reservations:
+            return "No reservations found."    
+        return "\n".join(
+            f"Reservation ID {res.reservation_id}: Room {res.room_number}, {res.customer_name} ({res.room_type}, {res.check_in_date} to {res.check_out_date})"
+            for res in cls.Reservations
+        )
